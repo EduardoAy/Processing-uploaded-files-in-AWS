@@ -1,0 +1,159 @@
+import sys
+import boto3
+import json
+import csv
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.job import Job
+
+def detect_delimiter(file_path):
+    # Extrai o bucket e o key do path S3
+    if not file_path.startswith("s3://"):
+        raise ValueError("Invalid S3 path. Must start with 's3://'")
+
+    path_parts = file_path.replace("s3://", "").split("/", 1)
+    if len(path_parts) < 2:
+        raise ValueError("Invalid S3 path. Format should be 's3://bucket/key'")
+   
+    bucket_name, file_key = path_parts[0], path_parts[1]
+
+    # Conectar ao S3 e pegar apenas a primeira linha do arquivo
+    s3_client = boto3.client('s3')
+    response = s3_client.get_object(Bucket=bucket_name, Key=file_key)
+   
+    # Lê apenas a primeira linha
+    first_line = response['Body'].read().decode('utf-8').split("\n")[0]
+
+    # Detecta o delimitador
+    sniffer = csv.Sniffer()
+    try:
+        dialect = sniffer.sniff(first_line)
+        return dialect.delimiter
+    except csv.Error:
+        raise ValueError("Could not detect delimiter. Make sure the file is valid.")
+
+
+# Function to read CSV with detected delimiter
+def read_csv_with_delimiters_v2(spark, file_path, delimiter=None):
+    if delimiter is None:
+        delimiter = detect_delimiter(file_path)
+    print(f"Detected delimiter: {repr(delimiter)}")
+    return spark.read.format("csv").option("sep", delimiter).option("header", True).option("inferSchema", True).load(file_path)
+   
+# Function to process and save files
+def process_and_save(df, output_path):
+    df_deduplicated = df.dropDuplicates()
+    df_deduplicated.repartition(1).write.mode("overwrite").format("parquet").save(output_path)
+    print(f"File processed and saved in: {output_path}")
+
+# Function to Create/Update Data Catalog Database/Table
+def create_or_update_glue_table(glueContext, output_path, database_name, table_name):
+    try:
+        if not output_path:
+            raise ValueError("Output path is empty.")
+       
+        df = spark.read.format("parquet").load(output_path)
+        print(f"DataFrame lido com sucesso a partir de: {output_path}")
+       
+        print(f"Database: {database_name}")
+        print(f"Table Name: {table_name}")
+       
+        spark.sql(f"CREATE DATABASE IF NOT EXISTS `{database_name}`")
+        print(f"Database '{database_name}' verificada/criada com sucesso.")
+       
+        spark.sql(f"""
+        CREATE EXTERNAL TABLE IF NOT EXISTS `{database_name}`.`{table_name}` (
+        {', '.join([f"`{col}` {dtype}" for col, dtype in df.dtypes])}
+        )
+        STORED AS PARQUET
+        LOCATION '{output_path}'
+        """)
+        print(f"Glue Data Catalog table '{table_name}' criada/atualizada na database '{database_name}'")
+    except Exception as e:
+        print(f"Error creating/updating Glue Data Catalog table: {str(e)}")
+
+# Job parameters
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'sqs_queue_url'])
+sqs_queue_url = args['sqs_queue_url']
+
+# Initialize Glue Context
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+# Initialize SQS client
+sqs_client = boto3.client('sqs')
+
+# Read messages from SQS queue
+response = sqs_client.receive_message(
+    QueueUrl=sqs_queue_url,
+    MaxNumberOfMessages=10,
+    WaitTimeSeconds=10
+)
+
+messages = response.get('Messages', [])
+if not messages:
+    print("No messages found.")
+    job.commit()
+    sys.exit(0)
+
+# Process each message from SQS queue
+for message in messages:
+    try:
+        body = json.loads(message['Body'])
+        s3_event = json.loads(body['Message']) if 'Message' in body else body
+
+        bucket_name = s3_event['Records'][0]['s3']['bucket']['name']
+        file_key = s3_event['Records'][0]['s3']['object']['key']
+       
+        print(f"Processing bucket file: {bucket_name}, key: {file_key}")
+       
+        s3_path = f"s3://{bucket_name}/{file_key}"
+        print(f"Reading file from: {s3_path}")
+       
+        df = read_csv_with_delimiters_v2(spark, s3_path)
+        print("CSV file uploaded from S3 successfully.")
+       
+        output_path = f"s3://{bucket_name}/processed/{file_key.split('/')[0]}/{file_key.split('/')[1]}"
+       
+        database_name = bucket_name
+        table_name = f"{file_key.split('/')[0]}_{file_key.split('/')[1].replace('.csv', '').replace('-', '_')}"
+
+       
+        try:
+            df_output = spark.read.format("parquet").load(output_path)
+            if df_output.count() > 0:
+                if df.schema == df_output.schema:
+                    df_final = df_output.unionByName(df)
+                    process_and_save(df_final, output_path)
+                    create_or_update_glue_table(glueContext, output_path, database_name, table_name)
+                else:
+                    print("The schemas are different. No action was taken.")
+        except Exception as e:
+            print(f"Error reading existing file or file not found: {str(e)}")
+            process_and_save(df, output_path)
+            create_or_update_glue_table(glueContext, output_path, database_name, table_name)
+
+        sqs_client.delete_message(
+            QueueUrl=sqs_queue_url,
+            ReceiptHandle=message['ReceiptHandle']
+        )
+        print("Message processed and deleted from the queue.")
+    except Exception as e:
+        print(f"Error processing queue message: {str(e)}")
+       
+       
+# Drop Temporary Folders
+s3_client = boto3.client('s3')
+prefix = "processed/"
+
+objects = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+for obj in objects.get("Contents", []):
+    if obj["Key"].endswith("_$folder$"):
+        print(f"Deleting: {obj['Key']}")
+        s3_client.delete_object(Bucket=bucket_name, Key=obj["Key"])
+
+job.commit()
