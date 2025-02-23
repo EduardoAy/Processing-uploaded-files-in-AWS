@@ -4,6 +4,7 @@ This pipeline integrates several components to automatically handle uploaded fil
 ![image](https://github.com/user-attachments/assets/fce59c38-d759-43d3-9bed-2aeb0c5b9f73)
 
 **Summary**
+
 S3: Receives the upload and sends a message to the broker (EventBridge).
 EventBridge: Acts as a trigger, triggering a workflow that will start the Glue Job.
 SQS: Provides the file information (path, file type, etc.) that will be consumed by the Glue Job. Based on this information, the job will read the file and perform the necessary transformations.
