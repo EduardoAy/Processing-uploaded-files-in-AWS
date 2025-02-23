@@ -17,6 +17,7 @@ Athena: Performs queries on the data, via Catalog.
 
 CloudWatch: Monitors metrics, logs and execution status.
 
+
 **Configuration**
 
 _S3 Bucket_
@@ -32,6 +33,7 @@ a) In "Create Notification", the following fields must be filled in:
 
 b) EventBridge must be set to "ON" 
 
+
 _Eventbridge (Broker)_ 
 
 EventBridge is the broker that receives notifications from the S3 Bucket. In this pipeline, it was used to act as a trigger for a Glue Workflow. 
@@ -43,39 +45,55 @@ Target: EventBridge must be configured to point to the Glue Workflow.
 _SQS (Queue Service)_
 
 SQS is a messaging service provided through a queue. In this pipeline, the objective is to integrate with the Glue Job, so that it consumes the messages from the queue, thus obtaining the information of the file to be read and processed (bucket name, file name, folders, etc.). 
+
 Configuration details: 
 In the Access policy, 2 items are important: the resource name (the SQS queue name itself) and the ARN of the bucket that was configured to send S3 notifications to this queue. To check the settings, we must click on the "Edit" button of the SQS queue. 
+
 
 _Glue Workflow_
 
 Glue workflow is the tool that orchestrates the entire data reading and transformation flow, being automatically triggered by a trigger (EventBridge), and starting a Glue Job.  
 The circle represents the trigger, while the rectangle refers to the Glue Job.
 
-_Glue Job _
 
-The Glue job can be a visual ETL or a programming code to perform tasks related to data ingestion, transformation and loading. In our case, the code was chosen to provide greater flexibility. Below are the job configuration details: 
-The required IAM permissions are as follows: 
-EventBridge Full Access: so that "trigger" events can trigger the job. 
-S3 Full Access: to allow reading and writing of data in S3. 
-Create-Catalog-databases-tables: to allow the job to interact with Databases and Tables of the Glue Data Catalog. Datasource-red-write-sqs: to allow the glue job to access and consume information from the queue service. Glue-publish-data-aquality: integration with the Data Quality service. 
-Logs-Cloudwatch: communication with CloudWatch, to record events and tasks. 
-Because the files are large, only the permissions are shown, without expanding them. Below the image is provided the link, where the permissions can be viewed in detail.
+_Glue Job_
+
+The Glue job can be a visual ETL or a programming code to perform tasks related to data ingestion, transformation and loading. In our case, the code was chosen to provide greater flexibility. Below are the job configuration details:
+
+  The required IAM permissions are as follows:
+  
+  EventBridge Full Access: so that "trigger" events can trigger the job.
+  
+  S3 Full Access: to allow reading and writing of data in S3.
+  
+  Create-Catalog-databases-tables: to allow the job to interact with Databases and Tables of the Glue Data Catalog. 
+  
+  Datasource-read-write-sqs: to allow the glue job to access and consume information from the queue service. 
+  
+  Glue-publish-data-quality: integration with the Data Quality service. 
+  
+  Logs-Cloudwatch: communication with CloudWatch, to record events and tasks. 
+
 
 _Bucket S3 (Data Target)_
 
 For the destination of the data processed by the job (deduplication, merge between dataframes, etc.), a directory within the bucket used as source is being used. Details below: 
-Bucket "source" / Bucket "target"
+Bucket "source" / Bucket "target".
+
 As explained in the Glue job item, all write and read permissions are already configured for this bucket and respective folders/files 
+
 
 _Glue Data Catalog_
 
 Through the Glue Job, Databases/Tables are created automatically, and are the representation of the metadata obtained from the uploaded file. 
-Below is an example of the objects already created, and the AWS link, in case additional details are needed. The creation/update information is within the Glue Job code. 
+The creation/update information is within the Glue Job code. 
 In our case, the Database has a specific name, and the tables are produced with dynamic names, which are a composition of the names of the folders and files created.
+
 
 _Cloudwatch Logs_
 
 CloudWatch is configured to log activities and events from various components, but in this pipeline, its main purpose is to record the step-by-step execution of the Glue Job. 
+
 
 _Querying data using Athena _
 
