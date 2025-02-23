@@ -99,5 +99,5 @@ CloudWatch is configured to log activities and events from various components, b
 _Querying data using Athena_
 
 Through the Athena console, it is possible to consult tables with data processed from the original file, and perform SQL operations. 
-To access, it is necessary to select the database (in our case, file-upload-source), and the tables will be displayed automatically. 
+To access, it is necessary to select the database, and the tables will be displayed automatically. 
 The details of each SQL operation will depend on what you want to execute.
