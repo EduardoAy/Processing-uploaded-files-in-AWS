@@ -8,7 +8,7 @@ from awsglue.context import GlueContext
 from awsglue.job import Job
 
 def detect_delimiter(file_path):
-    # Extrai o bucket e o key do path S3
+    # Extracts bucket and key from S3 path
     if not file_path.startswith("s3://"):
         raise ValueError("Invalid S3 path. Must start with 's3://'")
 
@@ -18,14 +18,14 @@ def detect_delimiter(file_path):
    
     bucket_name, file_key = path_parts[0], path_parts[1]
 
-    # Conectar ao S3 e pegar apenas a primeira linha do arquivo
+    # Connects to S3 and get only the first line of the file
     s3_client = boto3.client('s3')
     response = s3_client.get_object(Bucket=bucket_name, Key=file_key)
    
-    # Lê apenas a primeira linha
+    # Read only the first line
     first_line = response['Body'].read().decode('utf-8').split("\n")[0]
 
-    # Detecta o delimitador
+    # Detects the delimiter
     sniffer = csv.Sniffer()
     try:
         dialect = sniffer.sniff(first_line)
@@ -34,8 +34,8 @@ def detect_delimiter(file_path):
         raise ValueError("Could not detect delimiter. Make sure the file is valid.")
 
 
-# Function to read CSV with detected delimiter
-def read_csv_with_delimiters_v2(spark, file_path, delimiter=None):
+# Function to read file with detected delimiter
+def read_file_with_delimiters_v2(spark, file_path, delimiter=None):
     if delimiter is None:
         delimiter = detect_delimiter(file_path)
     print(f"Detected delimiter: {repr(delimiter)}")
@@ -43,8 +43,8 @@ def read_csv_with_delimiters_v2(spark, file_path, delimiter=None):
    
 # Function to process and save files
 def process_and_save(df, output_path):
-    df_deduplicated = df.dropDuplicates()
-    df_deduplicated.repartition(1).write.mode("overwrite").format("parquet").save(output_path)
+    <YOUR LOGIC HERE>
+    df_processed.repartition(1).write.mode("overwrite").format("parquet").save(output_path)
     print(f"File processed and saved in: {output_path}")
 
 # Function to Create/Update Data Catalog Database/Table
@@ -54,13 +54,13 @@ def create_or_update_glue_table(glueContext, output_path, database_name, table_n
             raise ValueError("Output path is empty.")
        
         df = spark.read.format("parquet").load(output_path)
-        print(f"DataFrame lido com sucesso a partir de: {output_path}")
+        print(f"DataFrame successfully read from: {output_path}")
        
         print(f"Database: {database_name}")
         print(f"Table Name: {table_name}")
        
         spark.sql(f"CREATE DATABASE IF NOT EXISTS `{database_name}`")
-        print(f"Database '{database_name}' verificada/criada com sucesso.")
+        print(f"Database '{database_name}' verified/created successfully.")
        
         spark.sql(f"""
         CREATE EXTERNAL TABLE IF NOT EXISTS `{database_name}`.`{table_name}` (
@@ -69,7 +69,7 @@ def create_or_update_glue_table(glueContext, output_path, database_name, table_n
         STORED AS PARQUET
         LOCATION '{output_path}'
         """)
-        print(f"Glue Data Catalog table '{table_name}' criada/atualizada na database '{database_name}'")
+        print(f"Glue Data Catalog table '{table_name}' created/updated in the database '{database_name}'")
     except Exception as e:
         print(f"Error creating/updating Glue Data Catalog table: {str(e)}")
 
@@ -115,7 +115,7 @@ for message in messages:
         print(f"Reading file from: {s3_path}")
        
         df = read_csv_with_delimiters_v2(spark, s3_path)
-        print("CSV file uploaded from S3 successfully.")
+        print("File uploaded from S3 successfully.")
        
         output_path = f"s3://{bucket_name}/processed/{file_key.split('/')[0]}/{file_key.split('/')[1]}"
        
