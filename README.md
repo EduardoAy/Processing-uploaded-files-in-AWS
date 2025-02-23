@@ -33,7 +33,8 @@ b) EventBridge must be set to "ON"
 _Eventbridge (Broker)_ 
 
 EventBridge is the broker that receives notifications from the S3 Bucket. In this pipeline, it was used to act as a trigger for a Glue Workflow. 
-According to previous alignments, only the upload of new .csv files will be forwarded to Glue Workflow. Therefore, the rule in the broker is created as shown in the image below, specifying the bucket and the object suffix:
+Only the upload of new files (with file suffix specified) will be forwarded to Glue Workflow.
+
 Target: EventBridge must be configured to point to the Glue Workflow: 
 
 _SQS (Queue Service)_
