@@ -22,12 +22,14 @@ CloudWatch: Monitors metrics, logs and execution status.
 _S3 Bucket_
 
 This S3 Bucket is the entry point of the pipeline, where the files should be inserted. 
-In the "Properties" tab, "Event Notifications" must be configured to allow sending S3 notifications to EventBridge and SQS: 
+In the "Properties" tab, "Event Notifications" must be configured to allow sending S3 notifications to EventBridge and SQS:
+
 a) In "Create Notification", the following fields must be filled in: 
 - Event Name; 
 - File Suffix: (must be specified) 
 - Event Type: Put (s3:ObjectCreated:Put) 
-- Destination: SQS Queue (queue must be specified) 
+- Destination: SQS Queue (queue must be specified)
+
 b) EventBridge must be set to "ON" 
 
 _Eventbridge (Broker)_ 
@@ -35,7 +37,8 @@ _Eventbridge (Broker)_
 EventBridge is the broker that receives notifications from the S3 Bucket. In this pipeline, it was used to act as a trigger for a Glue Workflow. 
 Only the upload of new files (with file suffix specified) will be forwarded to Glue Workflow.
 
-Target: EventBridge must be configured to point to the Glue Workflow: 
+Target: EventBridge must be configured to point to the Glue Workflow.
+
 
 _SQS (Queue Service)_
 
