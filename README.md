@@ -6,10 +6,15 @@ This pipeline integrates several components to automatically handle uploaded fil
 **Summary**
 
 S3: Receives the upload and sends a message to the broker (EventBridge).
+
 EventBridge: Acts as a trigger, triggering a workflow that will start the Glue Job.
+
 SQS: Provides the file information (path, file type, etc.) that will be consumed by the Glue Job. Based on this information, the job will read the file and perform the necessary transformations.
+
 Glue Job: Transforms the data and saves it to the second bucket (Parquet). It also produces the table in the Glue Data Catalog.
+
 Athena: Performs queries on the data, via Catalog.
+
 CloudWatch: Monitors metrics, logs and execution status.
 
 **Configuration **
