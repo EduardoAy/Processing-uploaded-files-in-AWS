@@ -95,7 +95,7 @@ _Cloudwatch Logs_
 CloudWatch is configured to log activities and events from various components, but in this pipeline, its main purpose is to record the step-by-step execution of the Glue Job. 
 
 
-_Querying data using Athena _
+_Querying data using Athena_
 
 Through the Athena console, it is possible to consult tables with data processed from the original file, and perform SQL operations. 
 To access, it is necessary to select the database (in our case, file-upload-source), and the tables will be displayed automatically. 
